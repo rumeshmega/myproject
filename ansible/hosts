@@ -1,0 +1,85 @@
+ansible setup 
+
+cd /opt
+cat > hosts
+vi hosts 
+[jenkins-master]
+10.1.1.62
+
+[jenkins-master:vars]
+ansible_user = ubuntu
+ansible_ssh_private_key_file = /opt/rum.ppk
+
+[jenkins-slave]
+10.1.1.120
+
+[jenkins-slave:vars]
+ansible_user = ubuntu
+ansible_ssh_private_key_file = /opt/rum.ppk
+
+cd /home/ubuntu
+copy key mv to /opt
+rum.ppk
+covert to pem key for ansible
+troubleshoot
+===========
+Your INI-style Ansible inventory file appears to be mostly correct. However, there's a small issue with the ansible_ssh_private_key_file variable assignments where there should be a space after the equal sign. Here's the corrected version:
+
+ini
+
+[jenkins-master]
+10.1.1.62
+
+[jenkins-master:vars]
+ansible_user = ubuntu
+ansible_ssh_private_key_file = /opt/rum.ppk
+
+[jenkins-slave]
+10.1.1.120
+
+[jenkins-slave:vars]
+ansible_user = ubuntu
+ansible_ssh_private_key_file = /opt/rum.ppk
+
+I added spaces after the equal sign to separate the variable names from their values, which is the correct syntax in an INI-style inventory file. This corrected version should work as expected for specifying Ansible variables for your Jenkins master and slave hosts.
+User
+<10.1.1.62> ESTABLISH SSH CONNECTION FOR USER: ubuntu
+<10.1.1.62> SSH: EXEC ssh -C -o ControlMaster=auto -o ControlPersist=60s -o 'IdentityFile="/opt/rum.ppk"' -o KbdInteractiveAuthentication=no -o PreferredAuthentications=gssapi-with-mic,gssapi-keyex,hostbased,publickey -o PasswordAuthentication=no -o 'User="ubuntu"' -o ConnectTimeout=10 -o 'ControlPath="/root/.ansible/cp/f5893c2f40"' 10.1.1.62 '/bin/sh -c '"'"'echo ~ubuntu && sleep 0'"'"''
+<10.1.1.120> ESTABLISH SSH CONNECTION FOR USER: ubuntu
+<10.1.1.120> SSH: EXEC ssh -C -o ControlMaster=auto -o ControlPersist=60s -o 'IdentityFile="/opt/rum.ppk"' -o KbdInteractiveAuthentication=no -o PreferredAuthentications=gssapi-with-mic,gssapi-keyex,hostbased,publickey -o PasswordAuthentication=no -o 'User="ubuntu"' -o ConnectTimeout=10 -o 'ControlPath="/root/.ansible/cp/52ca30f1dc"' 10.1.1.120 '/bin/sh -c '"'"'echo ~ubuntu && sleep 0'"'"''
+<10.1.1.62> (255, b'', b'Load key "/opt/rum.ppk": error in libcrypto\r\nubuntu@10.1.1.62: Permission denied (publickey).\r\n')
+ChatGPT
+
+The error message you're encountering, "Load key "/opt/rum.ppk": error in libcrypto\r\nubuntu@10.1.1.62: Permission denied (publickey)," indicates that Ansible is unable to establish an SSH connection to the target host 10.1.1.62 using the provided private key (/opt/rum.ppk). This error typically occurs when there's an issue with the SSH key or its format.
+
+Here's how you can troubleshoot and resolve the issue:
+
+    Check SSH Key Format: Ensure that the SSH key (/opt/rum.ppk) is in the correct format for use with OpenSSH. The .ppk format is used by PuTTY and needs to be converted to OpenSSH format. You can use puttygen to convert it:
+
+    bash
+
+puttygen /opt/rum.ppk -O private-openssh -o /opt/rum.pem
+
+This command will convert the key to the OpenSSH format and save it as /opt/rum.pem. Make sure to use the new .pem key in your Ansible command.
+
+SSH Key Permissions: Ensure that the permissions on the SSH key file (/opt/rum.pem) are set correctly. The file should be readable only by the owner. You can set the correct permissions using:
+
+bash
+
+chmod 600 /opt/rum.pem
+
+Check Key Path: Verify that the path to the SSH key (/opt/rum.pem) is correctly specified in your Ansible inventory or command. Make sure there are no extra spaces or typos in the path.
+
+SSH Agent: If you are using an SSH agent, ensure that the key is correctly added to the agent using ssh-add. Also, confirm that the SSH agent is running on the machine where you're executing Ansible.
+
+bash
+
+    eval $(ssh-agent -s)  # Start the SSH agent
+    ssh-add /opt/rum.pem  # Add the key to the agent
+
+    Host SSH Configuration: On the target host (10.1.1.62), make sure the SSH server is configured to allow key-based authentication (PasswordAuthentication no and PubkeyAuthentication yes in /etc/ssh/sshd_config), and that the corresponding public key is added to the ~ubuntu/.ssh/authorized_keys file for the ubuntu user.
+
+    Verbose Mode: You can run Ansible in verbose mode using the -vvv option to get more detailed information about the SSH connection. This can help diagnose the issue further.
+
+After performing these steps, try running your Ansible command again with the corrected key path (/opt/rum.pem) and ensure that the key is properly converted to OpenSSH format.
+
